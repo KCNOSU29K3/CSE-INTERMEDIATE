@@ -808,8 +808,6 @@ class CLI(Wrapper):
         Lists all contact IDs.
         Requires no parameters and always returns `None`.
         """
-        # breakline
-        print(Fore.GREEN, "~"*10)
         
         # iterate through contacts
         for i in self.get_all_contact_ids():
