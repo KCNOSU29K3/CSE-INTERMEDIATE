@@ -673,7 +673,7 @@ class CLI(Wrapper, PySimpleGUI_Interface):
             # inform user of stuff
             print(Fore.GREEN, "Enter your message here.")
             print(Fore.GREEN, "Lines once entered cannot be changed.")
-            print(Fore.GREEN, "Hit Ctrl+D to save.")
+            print(Fore.GREEN, "Hit Ctrl+D to save, or Ctrl+Z and Return on Windows.")
             lines:list = []
             
             # get input
