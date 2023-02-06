@@ -726,6 +726,7 @@ class CLI(Wrapper, PySimpleGUI_Interface):
             self.system_clear()
             print(Fore.RED, "EMAIL BOOT FAILED.")
             print(Fore.RED, "USING ALPHA EMAIL EDITOR...")
+            subject_content = email_editor_alpha()
             pass
         # confirm with user
         self.system_clear()
