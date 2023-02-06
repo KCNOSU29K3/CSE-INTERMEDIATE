@@ -663,6 +663,32 @@ class CLI(Wrapper, PySimpleGUI_Interface):
             # return message
             return message
 
+        
+        def email_editor_alpha() -> str:
+            """
+            A VERY primitive email editor.
+            Requires no parameters and returns a string.
+            """
+            print()
+            # inform user of stuff
+            print(Fore.GREEN, "Enter your message here.")
+            print(Fore.GREEN, "Lines once entered cannot be changed.")
+            print(Fore.GREEN, "Hit Ctrl+D to save.")
+            lines:list = []
+            
+            # get input
+            while True:
+                try:
+                    line = input(" ")
+                except EOFError:
+                    break
+                lines.append(line)
+                lines.append("\n")
+
+            # return input
+            return "".join(lines)
+
+        
         # clear after everything
         self.system_clear()
 
@@ -694,8 +720,13 @@ class CLI(Wrapper, PySimpleGUI_Interface):
             time.sleep(random.random() * 0.1)
         
         # boot it
-        subject_content:str = email_editor()
-
+        try:
+            subject_content:str = email_editor()
+        except:
+            self.system_clear()
+            print(Fore.RED, "EMAIL BOOT FAILED.")
+            print(Fore.RED, "USING ALPHA EMAIL EDITOR...")
+            pass
         # confirm with user
         self.system_clear()
         print(Fore.GREEN, "Are you sure you want to send this email? [Y/N]")
