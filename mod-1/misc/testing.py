@@ -1,3 +1,5 @@
+# DO NOT RUN
+
 import sys,os
 import curses
 
