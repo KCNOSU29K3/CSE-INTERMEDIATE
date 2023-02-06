@@ -414,13 +414,7 @@ class Wrapper(PhoneBook):
         return formatted_data
 
 
-class PySimpleGUI_Interface:
-    
-    def __init__(self) -> None:
-        pass
-
-
-class CLI(Wrapper, PySimpleGUI_Interface):
+class CLI(Wrapper):
 
 
     def __init__(self) -> None:
@@ -844,7 +838,8 @@ class CLI(Wrapper, PySimpleGUI_Interface):
 
         # present list
         # tmp is for choice indexing
-        options_list:list[str] = ["CLI", "PySimpleGUI"]
+        # was going to add GUI but ran out of time
+        options_list:list[str] = ["CLI"]
         tmp:int = 0
 
         # print the boot message
