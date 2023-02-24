@@ -18,7 +18,7 @@ def main():
     subtracting:bool = False
     # iterate through the prompts.
     for prompt in prompts:
-        i = float(input(prompt + "\n"))
+        i = float(input(prompt + "\n").strip("$"))
         # multiply i by -1 if subtracting so sum will remove instead of add
         i = i * -1 if subtracting else i
         subtracting = True
