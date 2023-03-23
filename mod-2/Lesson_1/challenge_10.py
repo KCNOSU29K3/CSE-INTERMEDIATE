@@ -10,7 +10,6 @@ def find_letter(string:str, char:str):
     string = [i for i in string]
     try: index = string.index(char) ; return index
     except ValueError: return -1
-    pass
 
 
 def main():
