@@ -17,7 +17,7 @@ def main():
     main function
     """
     letter = input("Please enter your letter\n").lower()
-    name = input("please enter the name to index\n")
+    name = input("please enter the name to index\n").lower()
     index = find_letter(name, letter)
     if index == -1:
         print("Letter does not exist.")
