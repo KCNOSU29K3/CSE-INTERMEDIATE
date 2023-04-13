@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 import random
 from time import perf_counter_ns
 from turtle import Turtle, Screen
@@ -58,6 +59,7 @@ class TurtleLogic:
         self.turt_1.color(turt_colors[1])
         self.turt_ref.color("black")
 
+        # set the speed
         self.turt_0.speed(speed)
         self.turt_1.speed(speed)
 
@@ -197,11 +199,16 @@ class CLI_Interface(TurtleLogic):
 # get performance characteristics.
 @timed
 def main():
+    """
+    Main Function.
+    """
     try:
         CLI_Interface()
+    
     except ValueError:
         print("Unusable value entered\nIrrecoverable: Exiting with code -1")
         exit(-1)
+    
     except Exception as E:
         print("Unknown Error detected: {E}\nIrrecoverable: Exiting with code -999")
         exit(-999)
