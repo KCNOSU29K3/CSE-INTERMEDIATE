@@ -1,15 +1,21 @@
 #! /usr/bin/env python3
 
-
 # imports
 import os
 import json
-import requests
 from textwrap import dedent
 from datetime import datetime, timedelta
 
 # address calculator
-from geopy.geocoders import Nominatim
+try:
+    import requests
+    from geopy.geocoders import Nominatim
+except ModuleNotFoundError:
+    os.system(
+        "python -m pip install requests geopy"
+        if os.name == "nt" else
+        "python3 -m pip install requests geopy"
+              )
 
 # define constants
 global TOPPINGS, SIZES
