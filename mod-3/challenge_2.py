@@ -374,15 +374,22 @@ def main():
             print(data[0])
         else:
             continue
+    
+    
+    print("\n\n")
 
 
     for data in line_data:
         averages = [int(i) for i in data[1:] if i != ""]
         print(f"Average for {data[0]} is {sum(averages)/len(averages):.2f}")
 
+    print("\n\n")
+
     for data in line_data:
         marks = [int(i) for i in data[1:] if i != ""]
         marks.sort()
+
+        print(f"\nStudent: {data[0]}\nHighest Mark: {marks[-1]}\nLowest Mark: {marks[0]}\nAverage:{sum(marks)/len(marks):.2f}")
         
 
 
