@@ -1,6 +1,11 @@
 #! /usr/bin/env python3
 import os
-
+import sys
+import json
+import base64
+import string
+import warnings
+from textwrap import dedent
 
 class InvalidFileOperation(Exception):
 
@@ -18,7 +23,7 @@ class File_Manager:
     def __init__(self, file_id_type:type) -> None:
         self.expects_id_type = file_id_type
 
-        self.file_registery = {}
+        self.file_registry:dict[type, File_Handler] = {}
 
 
     def add_file(self, id:type, file_path:str, mode:str = "r"):
@@ -27,46 +32,118 @@ class File_Manager:
         """
 
         if type(id) != self.expects_id_type:
-            raise TypeError("Invalid identifer used for file object management.")
+            raise TypeError("Invalid identifier used for file object management.")
 
         file_object = File_Handler(file_path, mode)
 
-        self.file_registery[id] = file_object
+        self.file_registry[id] = file_object
 
 
     def retrieve_file(self, id:type):
         """
-        Retrieves a file from the registery.
+        Retrieves a file from the registry.
         """
 
-        if type(id) != self.expects_id_type:
+        if type(id) != self.expects_id_type or type(id) != list[self.expects_id_type]:
             raise TypeError("Invalid identifier used for file object look up.")
 
-        if self.file_registery.get(id) is None:
+        if self.file_registry.get(id) is None:
             return None
         
-        return self.file_registery[id]
+        return self.file_registry[id]
 
 
     def remove_file(self, id):
         """
-        Removes a file from the interal registery.
+        Removes a file from the internal registry.
         """
 
         if type(id) != self.expects_id_type:
             raise TypeError("Invalid identifier used for file object deletion")
         
-        if self.file_registery.get(id) is None:
+        if self.file_registry.get(id) is None:
             return None
         
-        self.file_registery.pop(id)
+        self.file_registry.pop(id)
+
+
+    def open_file_list(self, filepath_list:list[str], mode_list:list[str], id_list:list[type]):
+        """
+        Iterates through two lists to open multiple file objects at once.
+        """
+
+        if not self.verify_list_lengths([filepath_list, mode_list, id_list]):
+            raise ValueError(
+                "Parameter list length mismatch.\n"
+                f"Expected length {len(filepath_list)}\n"
+                f"Got lengths: {len(filepath_list)}|{len(mode_list)}|{len(id_list)}"
+                )
+
+
+        for i in range(len(filepath_list)):
+            self.add_file(id_list[i], filepath_list[i], mode_list[i])
+
+
+    def write_to_file(self, fileID:type, content:str|bytes|list, flush:bool = True, lines:bool=False):
+        """
+        """
+        if self.file_registry.get(fileID) is None:
+            return -1
+        
+        file_object = self.file_registry[fileID]
+
+        file_object.write_file(content, flush, lines)
+
+
+    def write_to_file_list(self, content:list[str|bytes], filepaths:list[str], ids:list[type]):
+        """
+        writes to a list of files in series.
+        """
+
+        if not self.verify_list_lengths([content, filepaths, ids]):
+            raise ValueError (
+                "Parameter list length mismatch.\n"
+                f"Expected length {len(content)}.\n"
+                f"Got lengths {len(content)}|{len(filepaths)}|{len(ids)}"
+            )
+        pass
+
+
+    def change_file_mode(self, id, new_mode):
+        if self.file_registry.get(id) is None:
+            raise KeyError("Invalid file ID.")
+        self.file_registry[id].change_file_mode(new_mode)
+        return 0
+
+
+    def clear_file(self, id):
+        if self.file_registry.get(id) is None:
+            return -1
+        self.file_registry[id].truncate()
+
+
+    def verify_list_lengths(self, lists_to_verify:list[list]):
+        """
+        
+        """
+
+        # spooky stack overflow magic
+        if len(set(map(len, lists_to_verify))) == 1:
+            return True
+        return False
+
+
+    def read_file(self, id, len_=0, lines=False, index:int = None):
+        if self.file_registry.get(id) is None:
+            raise KeyError("Invalid file ID.")
+        return self.file_registry[id].read_file(len_, lines, index)
 
 
     def __del__(self):
         """
-        We dereference the internal registery, triggering the file_handlers to close their files.
+        We dereference the internal registry, triggering the file_handlers to close their files.
         """
-        del self.file_registery
+        del self.file_registry
 
 
 class File_Handler:
@@ -78,20 +155,20 @@ class File_Handler:
     """
 
 
-    def __init__(self, file:str, mode:str = "r") -> None:
-
+    def __init__(self, file:str, mode:str = "r", encoding:str = "utf-8") -> None:
 
         self.mode = mode
         self.file_location = file
+        self.supports_bytes = True if "b" in mode else False
+        
+        if self.mode == "x":
+            self.__create_file(self.file_location)
 
         # file handling variables
-        self.supports_bytes = False
-        self.supports_read, self.supports_write = self.__define_supports(self.mode)
 
         self.__check_file_exists()
-
+        self.encoding = encoding
         self.file_object = open(self.file_location, self.mode)
-
 
     # file methods
 
@@ -105,6 +182,16 @@ class File_Handler:
         `int` - An integer representing the current position of the file.
         """
         return self.file_object.tell()
+
+
+    def expose_file_object(self):
+        """
+        Exposes the internal file object to the outside world.
+
+        As a general use case, only do this if you need to pass the object to 
+        another function that consumes a file object.
+        """
+        return self.file_object
 
 
     def read_file(self, len_:int = 0, return_lines:bool = False, index:int = None):
@@ -136,9 +223,8 @@ class File_Handler:
         `InvalidFileOperation` - The current file mode does not support read.
         """
 
-
         # raise error if reading is not supported
-        if self.supports_read is not True:
+        if self.file_object.readable() is not True:
             raise InvalidFileOperation(f"InvalidFileOperation: File Mode \"{self.mode}\" does not support read.")
 
         # return only a slice of the file
@@ -162,7 +248,7 @@ class File_Handler:
             return self.file_object.read()   
 
 
-    def write_file(self, content:str|bytes, flush:bool = True):
+    def write_file(self, content:str|bytes|list, flush:bool = True, lines=False):
         """
         Writes content to the file.
 
@@ -182,16 +268,34 @@ class File_Handler:
         `InvalidFileOperation` - The current mode does not support writing.
         """
 
+        if isinstance(content, list) and not lines:
+            raise TypeError("Content was given as a list but flag for outputting lines is false.")
+
         # convert
-        if self.supports_bytes:
-            content = bytes(content)
+        if isinstance(content, list) and self.supports_bytes:
+            content = [bytes(i, self.encoding) for i in content]
+
+        elif isinstance(content, str) and self.supports_bytes:
+            content = bytes(content, self.encoding)
+        
+        elif isinstance(content, bytes) and not self.supports_bytes:
+            try:
+                content = str(content, self.encoding)
+        
+            except UnicodeDecodeError:
+                content = base64.encodebytes(content)
+                warnings.warn(f"Encoding bytes to {self.encoding} failed. Encoding in Base 64.", EncodingWarning)
+
 
         # raise error if write is not supported
-        if self.supports_write is not True:
+        if self.file_object.writable() is not True:
             raise InvalidFileOperation(f"InvalidFileOperation: File Mode {self.mode} does not support write.")
         
         # execute write
-        self.file_object.write(content)
+        if lines:
+            self.file_object.writelines(content)
+        else:
+            self.file_object.write(content)
 
 
         if flush:
@@ -232,9 +336,16 @@ class File_Handler:
 
         `int` - A return code of 0.
         """
+        self.file_object.flush()
         self.file_object.close()
         self.file_object = open(self.file_location, self.mode, encoding=encoding)
         return 0
+
+
+    def truncate(self):
+        self.file_object.truncate(0)
+        self.goto(0)
+
 
 
     def change_file_name(self, new_file_name:str, create_if_non_existent:bool = False):
@@ -267,6 +378,7 @@ class File_Handler:
         self.__check_file_exists()
 
         # shift out file objects
+        self.file_object.flush()
         self.file_object.close()
         self.file_object = open(self.file_location, self.mode)
 
@@ -290,11 +402,10 @@ class File_Handler:
         # assign new mode
         self.mode = new_mode
 
-        # identify read/write support
-        self.supports_read, self.supports_write = self.__define_supports(new_mode)
-        
+        self.supports_bytes = True if "b" in new_mode else False
 
         # shift out file objects
+        self.file_object.flush()
         self.file_object.close()
         self.file_object = open(self.file_location, self.mode)
         return 0
@@ -315,6 +426,8 @@ class File_Handler:
 
         `int` - An integer returncode of 0.
         """
+        if "w" in self.mode or "a" in self.mode:
+            return 0
         if not os.path.exists(self.file_location):
             if not hasattr(self, "file_object"):
                 self.file_object = open(f"{__file__}", "r")
@@ -337,64 +450,324 @@ class File_Handler:
         
         with open(file_location, "x") as file:
             pass
+        self.mode = "r"
+        self.supports_bytes = False
 
 
-    def __define_supports(self, mode:str) -> tuple:
-        """
-        Private method that identifies what operations 
-        a given file mode will support.
-
-        ### Parameters
-
-        `mode` the mode to check, as a string.
-
-        ### Returns
-
-        `(bool, bool)` - The read/write supports of the mode, respectively.
-
-        `(None, None)` - The File mode is not valid.
-        """
-        write_operators = ["w", "a", "wb", "ab"]
-        read_operators = ["r", "rb"]
-        
-        if "b" in mode:
-            self.supports_bytes = True
-
-        # decision tree
-        if mode == "x":
-            self.mode = "r"
-            self.__create_file(self.file_location)
-            return True, False
-
-        elif "+" in mode:
-            # read and write
-            return True, True
-        
-        elif mode in write_operators:
-            # read and write
-            return False, True
-        
-        elif mode in read_operators:
-            # read and write
-            return True, False
-        
-        else:
-            return None, None
-
-
-    # define destructor to close file before object 
     # destruction
     def __del__(self):
         """
         Destructor method that ensures the file object is closed 
         when the class object reference count drops to 0.
         """
-        self.file_object.flush()
-        self.file_object.close()
+        # checking for attribute since it will not be generated if 
+        # we attempt to generate a file with "x" operator and it already exists.
+        # that will raise an UnraisableExceptionWarning and spit a traceback to the
+        # console, which we don't want to do.
+        if hasattr(self, "file_object"):
+            self.file_object.flush()
+            self.file_object.close()
+
+
+class Inventory_Manager:
+
+
+    def __init__(self) -> None:
+
+        self.inventory = {}
+
+
+    def get_inventory(self):
+        return self.inventory
+
+
+    def update_inventory(self, restock_amount:int, item_id:type):
+        """
+        Restocks all products by a given amount
+        """
+        
+
+        if self.inventory.get(item_id) is None:
+            raise KeyError("Key for value not found.")
+
+        original_data = self.inventory[item_id]
+        self.inventory[item_id] = [original_data[0], restock_amount, original_data[2]]
+
+
+
+
+    def generate_product_base(self, items_list:list[str], prices:list[str], item_ids:list[type]):
+        """
+        Generates a dictionary for the product base.
+
+        mapping:
+
+        item_id -> (item name, default stock (0), price)
+        """
+        if len(set(map(len, [items_list, prices, item_ids]))) != 1:
+            raise ValueError(
+                "Parameter list length mismatch.\n"
+                f"Expected length {len(items_list)}\n"
+                f"Got lengths: {len(items_list)}|{len(prices)}|{len(item_ids)}"
+                )
+        
+
+        output = {}
+
+        for i in range(len(items_list)):
+            output[item_ids[i]] = (items_list[i], 0, prices[i])
+
+        self.inventory = output
+        return output
+
+
+    def parse_input(self, input_:str):
+        """
+        parses input.
+        """
+        input_ = input_.strip()
+        input_ = input_.replace(", ", ",")        
+        return input_.split(",")
+
+
+
+def clear():
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def restart():
+    os.execv(sys.executable, ["python" if os.name == "nt" else "python3"] + sys.argv)
+
+
+def verify_int_convertible(string_:str):
+    good_chars = [i for i in string.digits]
+
+    for char in string_:
+        if char not in good_chars:
+            return False
+    return True
+
+
+def verify_float_convertible(string_:str):
+    good_chars = [i for i in string.digits] + ["."]
+
+    for char in string_:
+        if char not in good_chars:
+            return False
+    return True
+
+
+def base(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
+    while True:
+        clear()
+        names = input("Please enter product names separated with commas.\n")
+        names = inventory_manager.parse_input(names)    
+        clear()
+        for i in names:
+            print(i)
+        should_restart = input("Are these item names correct? [Y/n]\n")
+        if "n" not in should_restart:
+            break
+        
+
+    while True:
+        clear()
+        for i in names:
+            print(i)
+
+        prices = input("Please enter prices for items, separated with commas and without symbols..\n")
+        prices = inventory_manager.parse_input(prices)
+        clear()
+
+        continue_ = False
+        for i in prices:
+            if not verify_float_convertible(i):
+                print("These prices are invalid. Please do not include any symbols in the prices.")
+                input("Press Enter to continue.\n")
+                continue_ = True
+            print(i)
+
+        if continue_:
+            continue
+
+        restart_prompt = input("Are these the correct prices? [Y/n]\n")
+        if "n" in restart_prompt:
+            continue
+
+    # create a dictionary for output use
+        if len(set(map(len, [names, prices]))) != 1:
+            print("You have provided an incorrect amount of prices.")
+            print(f"Please reenter the list with {len(names)} items.")
+        else:
+            break
+    
+    clear()
+    print_out_dict = {name: price for (name, price) in zip(names, prices)}
+    for name, price in print_out_dict.items():
+        print(f"{name}: {price}")
+    should_restart = input("Is this list correct? [Y/n]\n")
+    if "n" in should_restart:
+        restart()
+
+    item_ids = [str(i) for i in range(0, len(names))]
+
+    product_base_dict = inventory_manager.generate_product_base(names, prices, item_ids)
+    system_file_manager.write_to_file(0, json.dumps(product_base_dict, indent=4))
+
+
+def restock(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
+
+    while True:
+        clear()
+        product_base_dict = inventory_manager.get_inventory()
+        for item_id, data in product_base_dict.items():
+            print(f"product: {data[0]}: Stock: {data[1]}: System ID: {item_id}")
+
+        print("Please enter an id for a product.")
+        print("Enter CTRL+D (CTRL+Z on Windows) or enter \"EXIT\" to continue.")
+        try:
+            item_id = input()
+
+            if item_id.lower() == "exit":
+                break
+
+            if product_base_dict.get(item_id) is None:
+                print("Invalid system ID. Cannot Retrieve.")
+                input("Press enter to continue.\n")
+                continue
+
+            restock_amount = input("Please enter the amount to restock by.\n")
+        
+            if verify_int_convertible(restock_amount):
+                inventory_manager.update_inventory(int(restock_amount), item_id)
+            else:
+                print(f"{restock_amount} is not a number.")
+                print("Ignoring...")
+                input("Press Enter to continue.")
+                continue
+        except EOFError:
+            break
+        system_file_manager.clear_file(1)
+        system_file_manager.write_to_file(1, json.dumps(inventory_manager.get_inventory(), indent=4))
+
+
+def purchase(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
+
+    purchases = []
+    while True:
+        clear()
+        print("Purchase Script")
+        # display items
+        inventory = inventory_manager.get_inventory()
+        for id, data in inventory.items():
+            print(f"{data[0]}: Costs: {data[2]}: Stock: {data[1]}: System ID: {id}")
+
+        print(f"Current capital: ${sum(purchases):.2f}")
+
+        print("Please enter an id for a product.")
+        print("Enter CTRL+D (CTRL+Z on Windows) or enter \"EXIT\" to continue.")
+        try:
+            item_id = input()
+            
+            if item_id.lower() == "exit":
+                break
+            
+            if inventory.get(item_id) is None:
+                print("Invalid system ID. Cannot Retrieve.")
+                input("Press enter to continue.\n")
+                continue
+            purchase_amount = input("Please enter amount to purchase.\n")
+        
+            if not verify_int_convertible(purchase_amount):
+                print(f"{purchase_amount} is not a number.")
+                print("Ignoring...")
+                continue
+            
+            purchase_amount = int(purchase_amount)
+            stock_of_item = inventory[item_id][1]
+        
+
+            if stock_of_item < purchase_amount:
+                print("Current stock does not allow for this purchase.")
+                input("Press enter to continue.\n")
+                continue
+
+            # we do no checks on the prices since that was handled in the base function
+            price = float(inventory[item_id][2])*purchase_amount
+            purchases.append(price)
+
+            inventory_manager.update_inventory(int(stock_of_item-purchase_amount), item_id)
+        except EOFError:
+            break
+        system_file_manager.clear_file(2)
+        system_file_manager.write_to_file(2, json.dumps(inventory_manager.get_inventory(), indent=4))
+    return f"{sum(purchases):.2f}"
+
+
+def end(system_file_manager:File_Manager, money_earned:str):
+    clear()
+    print("What file Do you want to access?")
+    print("Base Stock (0)")
+    print("Restock (1)")
+    print("Business Quarter (2)")
+
+    chosen_file = input()
+
+
+    def output_data(file_ID):
+        system_file_manager.change_file_mode(0, "r")
+        system_data = json.loads(system_file_manager.read_file(0))
+        for item_ID, data in system_data.items():
+            print(dedent(
+                f"""
+                ~~~~~~~~~~~~~~
+                System Item ID: {item_ID}
+                Item Name: {data[0]}
+                Item Stock: {data[1]}
+                Item Price: {data[2]}
+                ~~~~~~~~~~~~~~j
+                """
+            ))
+        print(f"Capital earned during operation: ${money_earned}")
+
+
+    match chosen_file.lower():
+        
+        case "0":
+            output_data(0)
+        case "1":
+            output_data(1)
+        case "2":
+            output_data(2)
+        case "base stock":
+            output_data(0)
+        case "restock":
+            output_data(1)
+        case "business quarter":
+            output_data(2)
+        case _:
+            print("Invalid Identifier.")
+            print("Press Enter to continue.")
+            input()
+            end(system_file_manager, money_earned)
 
 
 def main():
-    pass
+
+    system_file_manager = File_Manager(int)
+    inventory_manager = Inventory_Manager()
+
+    output_files = ["product_base.json", "restock_update.json", "business_quarter.json"]
+    output_modes = ["w+"]*3
+    output_ids = [i for i in range(0, 3)]
+
+    system_file_manager.open_file_list(output_files, output_modes, output_ids)
+
+    base(inventory_manager, system_file_manager)
+    restock(inventory_manager, system_file_manager)
+    capital = purchase(inventory_manager, system_file_manager)
+    end(system_file_manager, capital)
+    
 
 if __name__ == "__main__":
     main()
