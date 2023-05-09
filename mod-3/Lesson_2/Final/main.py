@@ -70,6 +70,16 @@ class File_Manager:
     def open_file_list(self, filepath_list:list[str], mode_list:list[str], id_list:list[type]):
         """
         Iterates through two lists to open multiple file objects at once.
+
+        `filepath_list` - The list of filepaths to open.
+
+        `mode_list` - The list of modes to open the filepaths with.
+
+        `id_list` - the ids to give the newly created file objects.
+
+        #### Raises
+
+        `ValueError` - The lengths of the parameters are different and the write could not be executed.
         """
 
         if not self.verify_list_lengths([filepath_list, mode_list, id_list]):
@@ -86,6 +96,21 @@ class File_Manager:
 
     def write_to_file(self, fileID:type, content:str|bytes|list, flush:bool = True, lines:bool=False):
         """
+        Writes to a given file.
+
+        #### Parameters
+
+        `fileID` - The ID of the file to write to.
+
+        `Content` - The content to write to the file.
+
+        `Flush` - Boolean value that controls flushing of the data from the buffer.
+
+        `Lines` - Boolean value that controls `writelines()` usage.
+
+        ### Returns
+
+        `-1` - The given ID for the file is invalid.
         """
         if self.file_registry.get(fileID) is None:
             return -1
@@ -95,9 +120,21 @@ class File_Manager:
         file_object.write_file(content, flush, lines)
 
 
-    def write_to_file_list(self, content:list[str|bytes], filepaths:list[str], ids:list[type]):
+    def write_to_file_list(self, content:list[str|bytes|list], filepaths:list[str], ids:list[type]):
         """
         writes to a list of files in series.
+
+        #### Parameters
+
+        `content` - A list of the content to write to the files.
+
+        `filepaths` - The list of files to write to.
+
+        `ids` - The list of ids to give the newly written files.
+
+        #### Raises
+
+        `ValueError` - The 3 parameters have mismatching lengths. 
         """
 
         if not self.verify_list_lengths([content, filepaths, ids]):
@@ -109,7 +146,24 @@ class File_Manager:
         pass
 
 
-    def change_file_mode(self, id, new_mode):
+    def change_file_mode(self, id:type, new_mode:str):
+        """
+        Changes the file mode of a given file.
+
+        #### Parameters
+
+        `id` - the given id for the file.
+
+        `new_mode` - The new mode to switch to, as a string.
+
+        #### Raises
+
+        `KeyError` - The given file ID does not exist.
+
+        #### Returns
+        
+        `0` - Default return value.
+        """
         if self.file_registry.get(id) is None:
             raise KeyError("Invalid file ID.")
         self.file_registry[id].change_file_mode(new_mode)
@@ -117,6 +171,17 @@ class File_Manager:
 
 
     def clear_file(self, id):
+        """
+        Completely truncates a given file.
+
+        #### Parameters
+
+        `id` - A file id.
+
+        #### Returns
+
+        `-1` - The given file id is invalid.
+        """
         if self.file_registry.get(id) is None:
             return -1
         self.file_registry[id].truncate()
@@ -124,7 +189,15 @@ class File_Manager:
 
     def verify_list_lengths(self, lists_to_verify:list[list]):
         """
-        
+        Ensures that a given set of lists are of the same size.
+
+        #### Parameters
+
+        `lists_to_verify` - 1 Monolithic list containing the lists to be checked.
+
+        #### Returns
+
+        `bool` - Whether or not the lists are the same length.
         """
 
         # spooky stack overflow magic
@@ -134,6 +207,29 @@ class File_Manager:
 
 
     def read_file(self, id, len_=0, lines=False, index:int = None):
+        """
+        Reads the contents of a given file.
+
+        #### Parameters
+
+        `id` - The id of the file to read from.
+
+        `len_` - The amount of data to read from the file.
+
+        `lines` - Whether or not to return the data as a set of lines.
+
+        `index` - Where to start reading from the file.
+
+        #### Returns
+        
+        `list[str|bytes]` - The specified contents of the file, as a set of lines.
+
+        `str|bytes` - The specified contents of the file.
+
+        #### Raises
+
+        `KeyError` - The given file id does not exist.
+        """
         if self.file_registry.get(id) is None:
             raise KeyError("Invalid file ID.")
         return self.file_registry[id].read_file(len_, lines, index)
@@ -343,6 +439,11 @@ class File_Handler:
 
 
     def truncate(self):
+        """
+        Completely truncates the file.
+
+        Does not return a value.
+        """
         self.file_object.truncate(0)
         self.goto(0)
 
@@ -478,15 +579,26 @@ class Inventory_Manager:
 
 
     def get_inventory(self):
+        """
+        Returns the internal inventory.
+
+        Takes no parameters.
+        """
         return self.inventory
 
 
     def update_inventory(self, restock_amount:int, item_id:type):
         """
-        Restocks all products by a given amount
+        Restocks a given product be a given amount.
+
+        #### Parameters
+
+        `restock_amount` - The amount to restock the given item by.
+
+        `item_id` - The id of the item, as a given type.
         """
         
-
+        # check id exists.
         if self.inventory.get(item_id) is None:
             raise KeyError("Key for value not found.")
 
@@ -503,7 +615,17 @@ class Inventory_Manager:
         mapping:
 
         item_id -> (item name, default stock (0), price)
+
+        #### Parameters
+
+        `items_list` - The list of item names, as strings.
+
+        `prices`  - The list of item prices, as strings.
+
+        `item_ids` - The item ids, as a set of types.
         """
+
+        # stackoverflow magic to detect if all list lengths are the same.
         if len(set(map(len, [items_list, prices, item_ids]))) != 1:
             raise ValueError(
                 "Parameter list length mismatch.\n"
@@ -517,6 +639,7 @@ class Inventory_Manager:
         for i in range(len(items_list)):
             output[item_ids[i]] = (items_list[i], 0, prices[i])
 
+        # return and store for easier data manipulation.
         self.inventory = output
         return output
 
@@ -524,22 +647,35 @@ class Inventory_Manager:
     def parse_input(self, input_:str):
         """
         parses input.
+
+        ### Parameters
+
+        `input_` - The input to parse, as a string.
         """
         input_ = input_.strip()
         input_ = input_.replace(", ", ",")        
         return input_.split(",")
 
 
-
 def clear():
+    """
+    Small function that clears stdout.
+    """
     os.system("cls" if os.name == "nt" else "clear")
 
 
 def restart():
+    """
+    Small function that restarts the program as a whole.
+    """
     os.execv(sys.executable, ["python" if os.name == "nt" else "python3"] + sys.argv)
 
 
 def verify_int_convertible(string_:str):
+    """
+    Small function that ensures a given string can
+    be converted to an integer.
+    """
     good_chars = [i for i in string.digits]
 
     for char in string_:
@@ -549,6 +685,10 @@ def verify_int_convertible(string_:str):
 
 
 def verify_float_convertible(string_:str):
+    """
+    small function that ensures a string can be converted 
+    to a floating point value.
+    """
     good_chars = [i for i in string.digits] + ["."]
 
     for char in string_:
@@ -558,8 +698,19 @@ def verify_float_convertible(string_:str):
 
 
 def base(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
+    """
+    Queries the user for the stock base. Requires an existent `Inventory_Manager` and
+    `File_Manager` to share data, and returns None.
+
+    #### Parameters
+
+    `inventory_manager` - An inventory manager class, used to store and manipulate data.
+
+    `system_file_manager` - A file manager class, used to interact with the filesystem.
+    """
+
+    # query user for the names first
     while True:
-        clear()
         names = input("Please enter product names separated with commas.\n")
         names = inventory_manager.parse_input(names)    
         clear()
@@ -569,16 +720,23 @@ def base(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
         if "n" not in should_restart:
             break
         
-
+    
+    # price grabbing
     while True:
+        
         clear()
+        # so the user has a better idea of what they are pricing
         for i in names:
             print(i)
 
-        prices = input("Please enter prices for items, separated with commas and without symbols..\n")
+        # ask and parse input
+        prices = input("Please enter prices for items, separated with commas and without symbols.\n")
         prices = inventory_manager.parse_input(prices)
         clear()
 
+        # ensure that we can convert to float for these prices
+        # we do this here since it saves us a headache down the road and 
+        # allows the user to correct their errors.
         continue_ = False
         for i in prices:
             if not verify_float_convertible(i):
@@ -589,12 +747,16 @@ def base(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
 
         if continue_:
             continue
-
+        
+        # ensure that these prices are the ones they want
         restart_prompt = input("Are these the correct prices? [Y/n]\n")
         if "n" in restart_prompt:
             continue
 
     # create a dictionary for output use
+
+        # this magic was obtained from stackoverflow and checks that both lists
+        # are the same size
         if len(set(map(len, [names, prices]))) != 1:
             print("You have provided an incorrect amount of prices.")
             print(f"Please reenter the list with {len(names)} items.")
@@ -602,6 +764,7 @@ def base(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
             break
     
     clear()
+    # final check
     print_out_dict = {name: price for (name, price) in zip(names, prices)}
     for name, price in print_out_dict.items():
         print(f"{name}: {price}")
@@ -609,25 +772,40 @@ def base(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
     if "n" in should_restart:
         restart()
 
+    # list of item ids for the base dict
     item_ids = [str(i) for i in range(0, len(names))]
 
+    # output base
     product_base_dict = inventory_manager.generate_product_base(names, prices, item_ids)
     system_file_manager.write_to_file(0, json.dumps(product_base_dict, indent=4))
 
 
 def restock(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
+    """
+    Queries the user for new stock to save. Requires an `Inventory_Manager` and 
+    `File_Manager` to handle data.
 
+    #### Parameters
+
+    `inventory_manager` - An inventory management class that handles the inventory.
+
+    `system_file_manager` - A file manager that handles file interactions.
+    """
     while True:
         clear()
+        # output current system data
         product_base_dict = inventory_manager.get_inventory()
         for item_id, data in product_base_dict.items():
             print(f"product: {data[0]}: Stock: {data[1]}: System ID: {item_id}")
 
         print("Please enter an id for a product.")
         print("Enter CTRL+D (CTRL+Z on Windows) or enter \"EXIT\" to continue.")
+
+        # try/except to catch CTRL+D
         try:
             item_id = input()
 
+            # check for break conditions
             if item_id.lower() == "exit":
                 break
 
@@ -637,27 +815,39 @@ def restock(inventory_manager:Inventory_Manager, system_file_manager:File_Manage
                 continue
 
             restock_amount = input("Please enter the amount to restock by.\n")
-        
+            
+            # ensure we have a usable input 
             if verify_int_convertible(restock_amount):
                 inventory_manager.update_inventory(int(restock_amount), item_id)
             else:
+                # inform user that their input was bad
                 print(f"{restock_amount} is not a number.")
                 print("Ignoring...")
                 input("Press Enter to continue.")
                 continue
         except EOFError:
             break
+
+        # output
         system_file_manager.clear_file(1)
         system_file_manager.write_to_file(1, json.dumps(inventory_manager.get_inventory(), indent=4))
 
 
 def purchase(inventory_manager:Inventory_Manager, system_file_manager:File_Manager):
+    """
+    Queries the user for items to purchase.
+    Keeps track of money spent.
+    """
 
+    # purchases defined outside of loop to keep the data
     purchases = []
     while True:
         clear()
-        print("Purchase Script")
+        # inform the user of what this us
+        print("Purchase Window")
         # display items
+
+        # output items + capital
         inventory = inventory_manager.get_inventory()
         for id, data in inventory.items():
             print(f"{data[0]}: Costs: {data[2]}: Stock: {data[1]}: System ID: {id}")
@@ -667,6 +857,8 @@ def purchase(inventory_manager:Inventory_Manager, system_file_manager:File_Manag
         print("Please enter an id for a product.")
         print("Enter CTRL+D (CTRL+Z on Windows) or enter \"EXIT\" to continue.")
         try:
+
+            # ensure we have usable input and check guard clauses
             item_id = input()
             
             if item_id.lower() == "exit":
@@ -677,7 +869,7 @@ def purchase(inventory_manager:Inventory_Manager, system_file_manager:File_Manag
                 input("Press enter to continue.\n")
                 continue
             purchase_amount = input("Please enter amount to purchase.\n")
-        
+
             if not verify_int_convertible(purchase_amount):
                 print(f"{purchase_amount} is not a number.")
                 print("Ignoring...")
@@ -696,15 +888,25 @@ def purchase(inventory_manager:Inventory_Manager, system_file_manager:File_Manag
             price = float(inventory[item_id][2])*purchase_amount
             purchases.append(price)
 
+            # update the inventory
             inventory_manager.update_inventory(int(stock_of_item-purchase_amount), item_id)
         except EOFError:
             break
+
+        # output
+        # clear the file so that writing again will not append to already existent data.
         system_file_manager.clear_file(2)
         system_file_manager.write_to_file(2, json.dumps(inventory_manager.get_inventory(), indent=4))
+    
+    # we return the money gained for the end function.
     return f"{sum(purchases):.2f}"
 
 
 def end(system_file_manager:File_Manager, money_earned:str):
+    """
+    Ending function that allows the user to access any one of the 3 files.
+    Requires a `File_Manager` to access files.
+    """
     clear()
     print("What file Do you want to access?")
     print("Base Stock (0)")
@@ -715,8 +917,11 @@ def end(system_file_manager:File_Manager, money_earned:str):
 
 
     def output_data(file_ID):
-        system_file_manager.change_file_mode(0, "r")
-        system_data = json.loads(system_file_manager.read_file(0))
+        """
+        Small internal function to reduce code needed for output.
+        """
+        system_file_manager.change_file_mode(file_ID, "r")
+        system_data = json.loads(system_file_manager.read_file(file_ID))
         for item_ID, data in system_data.items():
             print(dedent(
                 f"""
@@ -730,7 +935,7 @@ def end(system_file_manager:File_Manager, money_earned:str):
             ))
         print(f"Capital earned during operation: ${money_earned}")
 
-
+    # simple match statement to find output.
     match chosen_file.lower():
         
         case "0":
@@ -753,7 +958,11 @@ def end(system_file_manager:File_Manager, money_earned:str):
 
 
 def main():
+    """
+    Main function of program.
+    """
 
+    # create required data
     system_file_manager = File_Manager(int)
     inventory_manager = Inventory_Manager()
 
@@ -763,6 +972,7 @@ def main():
 
     system_file_manager.open_file_list(output_files, output_modes, output_ids)
 
+    # main program
     base(inventory_manager, system_file_manager)
     restock(inventory_manager, system_file_manager)
     capital = purchase(inventory_manager, system_file_manager)
